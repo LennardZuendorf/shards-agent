@@ -2113,6 +2113,35 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     await shell.showItemInFolder(skillDir)
   })
 
+  // Scan global skills directories (~/.claude/skills and ~/.agents/skills)
+  ipcMain.handle(IPC_CHANNELS.SKILLS_SCAN_GLOBAL, async () => {
+    ipcLog.info('SKILLS_SCAN_GLOBAL: Scanning global skills directories')
+    const { scanGlobalSkills } = await import('@craft-agent/shared/skills')
+    const skills = await scanGlobalSkills()
+    ipcLog.info(`SKILLS_SCAN_GLOBAL: Found ${skills.length} global skills`)
+    return skills
+  })
+
+  // Import a skill from global directories (create symlink)
+  ipcMain.handle(IPC_CHANNELS.SKILLS_IMPORT, async (_event, workspaceId: string, sourcePath: string, slug: string) => {
+    ipcLog.info(`SKILLS_IMPORT: Importing skill "${slug}" from ${sourcePath} to workspace ${workspaceId}`)
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) {
+      throw new Error('Workspace not found')
+    }
+
+    const { importSkill } = await import('@craft-agent/shared/skills')
+    const result = await importSkill(sourcePath, slug, workspace.rootPath)
+    
+    if (result.success) {
+      ipcLog.info(`SKILLS_IMPORT: Successfully imported skill "${slug}"`)
+    } else {
+      ipcLog.error(`SKILLS_IMPORT: Failed to import skill "${slug}": ${result.error}`)
+    }
+    
+    return result
+  })
+
   // ============================================================
   // Status Management (Workspace-scoped)
   // ============================================================

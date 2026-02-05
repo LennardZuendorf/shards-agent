@@ -668,6 +668,8 @@ export const IPC_CHANNELS = {
   SKILLS_OPEN_EDITOR: 'skills:openEditor',
   SKILLS_OPEN_FINDER: 'skills:openFinder',
   SKILLS_CHANGED: 'skills:changed',
+  SKILLS_SCAN_GLOBAL: 'skills:scanGlobal',    // Scan ~/.claude/skills and ~/.agents/skills
+  SKILLS_IMPORT: 'skills:import',              // Import skill (create symlink)
 
   // Status management (workspace-scoped)
   STATUSES_LIST: 'statuses:list',
@@ -950,6 +952,9 @@ export interface ElectronAPI {
   deleteSkill(workspaceId: string, skillSlug: string): Promise<void>
   openSkillInEditor(workspaceId: string, skillSlug: string): Promise<void>
   openSkillInFinder(workspaceId: string, skillSlug: string): Promise<void>
+  // Global skills import
+  scanGlobalSkills(): Promise<LoadedSkill[]>
+  importSkill(workspaceId: string, sourcePath: string, slug: string): Promise<import('@craft-agent/shared/skills').ImportResult>
 
   // Skills change listener (live updates when skills are added/removed/modified)
   onSkillsChanged(callback: (skills: LoadedSkill[]) => void): () => void

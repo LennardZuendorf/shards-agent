@@ -9,16 +9,21 @@
 
 import * as React from 'react'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { GripHorizontal } from 'lucide-react'
+import { GripHorizontal, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react' // motion used for backdrop only
+import { toast } from 'sonner'
 import { Popover, PopoverTrigger, PopoverContent } from './popover'
 import { Button } from './button'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs'
+import { ScrollArea } from './scroll-area'
 import { cn } from '@/lib/utils'
 import { usePlatform } from '@craft-agent/ui'
-import type { ContentBadge, Session, CreateSessionOptions } from '../../../shared/types'
+import type { ContentBadge, Session, CreateSessionOptions, LoadedSkill } from '../../../shared/types'
+import type { ImportResult } from '@craft-agent/shared/skills'
 import { useActiveWorkspace, useAppShellContext, useSession } from '@/context/AppShellContext'
 import { useEscapeInterrupt } from '@/context/EscapeInterruptContext'
 import { ChatDisplay } from '../app-shell/ChatDisplay'
+import { SkillAvatar } from './skill-avatar'
 
 /** Rotating placeholders for compact mode input - short, action-oriented */
 const COMPACT_PLACEHOLDERS = [
@@ -684,6 +689,16 @@ export function EditPopover({
   // Model state for ChatDisplay (starts with prop value, can be changed by user)
   const [currentModel, setCurrentModel] = useState(model || 'haiku')
 
+  // Tab state for add-skill mode (New vs Import)
+  const isAddSkillMode = context.label === 'Add Skill'
+  const [activeTab, setActiveTab] = useState<'new' | 'import'>('new')
+  
+  // Global skills import state
+  const [globalSkills, setGlobalSkills] = useState<LoadedSkill[]>([])
+  const [workspaceSkills, setWorkspaceSkills] = useState<LoadedSkill[]>([])
+  const [isLoadingSkills, setIsLoadingSkills] = useState(false)
+  const [importingSkills, setImportingSkills] = useState<Set<string>>(new Set())
+
   // Create a stub session for ChatDisplay when no real session exists yet
   // This allows showing the input before the first message is sent
   const stubSession = useMemo((): Session => ({
@@ -857,8 +872,66 @@ export function EditPopover({
     if (open) {
       setCurrentModel(model || 'haiku')
       resetInlineSession()
+      setActiveTab('new') // Reset to New tab
+      // Clear skills cache when reopening to get fresh data
+      setGlobalSkills([])
+      setWorkspaceSkills([])
     }
   }, [open, model, resetInlineSession])
+
+  // Scan global skills and load workspace skills when Import tab is opened
+  useEffect(() => {
+    if (open && isAddSkillMode && activeTab === 'import' && globalSkills.length === 0 && !isLoadingSkills && workspace?.id) {
+      setIsLoadingSkills(true)
+      Promise.all([
+        window.electronAPI.scanGlobalSkills(),
+        window.electronAPI.getSkills(workspace.id)
+      ])
+        .then(([global, workspaceSkillsList]) => {
+          setGlobalSkills(global)
+          setWorkspaceSkills(workspaceSkillsList)
+        })
+        .catch(err => {
+          console.error('Failed to load skills:', err)
+        })
+        .finally(() => {
+          setIsLoadingSkills(false)
+        })
+    }
+  }, [open, isAddSkillMode, activeTab, globalSkills.length, isLoadingSkills, workspace?.id])
+
+  // Handle importing a skill
+  const handleImportSkill = useCallback(async (skill: LoadedSkill) => {
+    if (!workspace?.id) return
+
+    // Mark as importing
+    setImportingSkills(prev => new Set([...prev, skill.slug]))
+    
+    try {
+      const result = await window.electronAPI.importSkill(workspace.id, skill.path, skill.slug)
+      
+      if (result.success) {
+        // Success - close popover
+        setOpen(false)
+      } else {
+        // Show error toast
+        toast.error('Failed to import skill', {
+          description: result.error || 'Unknown error',
+        })
+      }
+    } catch (err) {
+      toast.error('Failed to import skill', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    } finally {
+      // Remove from importing state
+      setImportingSkills(prev => {
+        const next = new Set(prev)
+        next.delete(skill.slug)
+        return next
+      })
+    }
+  }, [workspace?.id, setOpen])
 
   // Handle sending message from ChatDisplay (inline mode)
   // Creates hidden session on first message, then uses App context for sending
@@ -953,19 +1026,133 @@ export function EditPopover({
                 <GripHorizontal className="w-4 h-4 text-muted-foreground/30" />
               </div>
 
-              {/* Content area - always uses compact ChatDisplay */}
+              {/* Content area - tabs for add-skill, ChatDisplay for others */}
               <div className="flex-1 flex flex-col bg-foreground-2" style={{ height: '100%' }}>
-                <ChatDisplay
-                  session={displaySession}
-                  onSendMessage={inlineExecution ? handleInlineSendMessage : handleLegacySendMessage}
-                  onOpenFile={onOpenFile || (() => {})}
-                  onOpenUrl={onOpenUrl || (() => {})}
-                  currentModel={currentModel}
-                  onModelChange={setCurrentModel}
-                  compactMode={true}
-                  placeholder={placeholder}
-                  emptyStateLabel={context.label}
-                />
+                {isAddSkillMode ? (
+                  <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'new' | 'import')} className="flex flex-col h-full">
+                    <div className="px-4 pt-8 pb-2">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="new">New</TabsTrigger>
+                        <TabsTrigger value="import">Import</TabsTrigger>
+                      </TabsList>
+                    </div>
+                    
+                    <TabsContent value="new" className="flex-1 mt-0 data-[state=inactive]:hidden">
+                      <ChatDisplay
+                        session={displaySession}
+                        onSendMessage={inlineExecution ? handleInlineSendMessage : handleLegacySendMessage}
+                        onOpenFile={onOpenFile || (() => {})}
+                        onOpenUrl={onOpenUrl || (() => {})}
+                        currentModel={currentModel}
+                        onModelChange={setCurrentModel}
+                        compactMode={true}
+                        placeholder={placeholder}
+                        emptyStateLabel={context.label}
+                      />
+                    </TabsContent>
+                    
+                    <TabsContent value="import" className="flex-1 mt-0 overflow-hidden data-[state=inactive]:hidden">
+                      <div className="h-full flex flex-col">
+                        {/* Disclaimer */}
+                        <div className="px-4 py-3 bg-foreground/5 text-xs text-foreground/70">
+                          Skills will be symlinked from global folders. Changes to originals will reflect here.
+                        </div>
+                        
+                        {/* Skills list */}
+                        <ScrollArea className="flex-1">
+                          {isLoadingSkills ? (
+                            <div className="flex items-center justify-center py-8 text-sm text-foreground/50">
+                              Scanning global skills...
+                            </div>
+                          ) : globalSkills.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                              <p className="text-sm text-foreground/70 mb-2">No skills found in global directories</p>
+                              <p className="text-xs text-foreground/50">~/.claude/skills or ~/.agents/skills</p>
+                            </div>
+                          ) : (
+                            <div className="py-2">
+                              {(() => {
+                                // Create a Set of imported skill slugs for O(1) lookup
+                                const importedSlugs = new Set(workspaceSkills.map(s => s.slug))
+                                
+                                // Sort: not imported first, then imported
+                                const sortedSkills = [...globalSkills].sort((a, b) => {
+                                  const aImported = importedSlugs.has(a.slug)
+                                  const bImported = importedSlugs.has(b.slug)
+                                  if (aImported === bImported) return 0
+                                  return aImported ? 1 : -1
+                                })
+                                
+                                return sortedSkills.map((skill) => {
+                                  const isImporting = importingSkills.has(skill.slug)
+                                  const isAlreadyImported = importedSlugs.has(skill.slug)
+                                  
+                                  return (
+                                    <div
+                                      key={skill.slug}
+                                      className={cn(
+                                        "flex items-start gap-3 px-4 py-3 transition-colors",
+                                        isAlreadyImported
+                                          ? "opacity-50 cursor-not-allowed"
+                                          : "hover:bg-foreground/2"
+                                      )}
+                                    >
+                                      <SkillAvatar skill={skill} size="sm" workspaceId={workspace?.id} />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-sm mb-0.5">
+                                          {skill.metadata.name}
+                                        </div>
+                                        <div className="text-xs text-foreground/70 line-clamp-2">
+                                          {skill.metadata.description}
+                                        </div>
+                                        {isAlreadyImported && (
+                                          <div className="text-xs text-foreground/50 mt-1 flex items-center gap-1">
+                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                            Already imported
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="shrink-0"
+                                        onClick={() => handleImportSkill(skill)}
+                                        disabled={isImporting || isAlreadyImported}
+                                      >
+                                        {isImporting ? (
+                                          'Importing...'
+                                        ) : isAlreadyImported ? (
+                                          'Imported'
+                                        ) : (
+                                          <>
+                                            <Download className="w-3.5 h-3.5 mr-1.5" />
+                                            Import
+                                          </>
+                                        )}
+                                      </Button>
+                                    </div>
+                                  )
+                                })
+                              })()}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                ) : (
+                  <ChatDisplay
+                    session={displaySession}
+                    onSendMessage={inlineExecution ? handleInlineSendMessage : handleLegacySendMessage}
+                    onOpenFile={onOpenFile || (() => {})}
+                    onOpenUrl={onOpenUrl || (() => {})}
+                    currentModel={currentModel}
+                    onModelChange={setCurrentModel}
+                    compactMode={true}
+                    placeholder={placeholder}
+                    emptyStateLabel={context.label}
+                  />
+                )}
               </div>
 
               {/* Bottom-right resize handle - invisible hit area */}

@@ -6,3 +6,5 @@
 
 export * from './types.ts';
 export * from './storage.ts';
+export * from './discovery.ts';
+export * from './import.ts';
