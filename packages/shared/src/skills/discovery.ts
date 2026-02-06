@@ -40,7 +40,7 @@ export function scanGlobalSkills(customHomeDir?: string): LoadedSkill[] {
       const entries = readdirSync(dir, { withFileTypes: true });
       
       for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
+        if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
 
         const skillPath = join(dir, entry.name);
         const skillFile = join(skillPath, 'SKILL.md');
@@ -52,9 +52,23 @@ export function scanGlobalSkills(customHomeDir?: string): LoadedSkill[] {
           const content = readFileSync(skillFile, 'utf-8');
           const parsed = matter(content);
 
-          // Validate required fields
-          if (!parsed.data.name || !parsed.data.description) {
-            continue;
+          // Use fallbacks for missing required fields
+          let name = parsed.data.name as string | undefined;
+          let description = parsed.data.description as string | undefined;
+          let hasBrokenFrontmatter = false;
+
+          if (!name) {
+            // Fallback: use slug as name (convert kebab-case to Title Case)
+            name = entry.name.split('-').map(word =>
+              word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+            hasBrokenFrontmatter = true;
+          }
+
+          if (!description) {
+            // Fallback: use generic description
+            description = `Skill instructions for ${name}`;
+            hasBrokenFrontmatter = true;
           }
 
           // Validate and extract optional icon field
@@ -63,8 +77,8 @@ export function scanGlobalSkills(customHomeDir?: string): LoadedSkill[] {
           skills.push({
             slug: entry.name,
             metadata: {
-              name: parsed.data.name as string,
-              description: parsed.data.description as string,
+              name,
+              description,
               globs: parsed.data.globs as string[] | undefined,
               alwaysAllow: parsed.data.alwaysAllow as string[] | undefined,
               icon,
@@ -72,6 +86,7 @@ export function scanGlobalSkills(customHomeDir?: string): LoadedSkill[] {
             content: parsed.content,
             iconPath: findIconFile(skillPath),
             path: skillPath,
+            hasBrokenFrontmatter,
           });
         } catch {
           // Skip skills with parsing errors

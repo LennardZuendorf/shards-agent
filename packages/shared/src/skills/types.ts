@@ -40,4 +40,6 @@ export interface LoadedSkill {
   iconPath?: string;
   /** Absolute path to skill directory */
   path: string;
+  /** Warning flag when frontmatter is missing or incomplete (name/description used fallback values) */
+  hasBrokenFrontmatter?: boolean;
 }

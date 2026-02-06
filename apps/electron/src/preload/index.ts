@@ -298,6 +298,8 @@ const api: ElectronAPI = {
   // Global skills import
   scanGlobalSkills: () =>
     ipcRenderer.invoke(IPC_CHANNELS.SKILLS_SCAN_GLOBAL),
+  scanLocalSkills: (workingDirectory: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKILLS_SCAN_LOCAL, workingDirectory),
   importSkill: (workspaceId: string, sourcePath: string, slug: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.SKILLS_IMPORT, workspaceId, sourcePath, slug),
 

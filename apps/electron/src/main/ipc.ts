@@ -2122,6 +2122,23 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     return skills
   })
 
+  // Scan local skills from working directory
+  ipcMain.handle(IPC_CHANNELS.SKILLS_SCAN_LOCAL, async (_event, workingDirectory: string) => {
+    try {
+      // Security: Validate path is within allowed directories
+      const validatedPath = await validateFilePath(workingDirectory)
+      
+      ipcLog.info(`SKILLS_SCAN_LOCAL: Scanning working directory: ${validatedPath}`)
+      const { scanLocalSkills } = await import('@craft-agent/shared/skills')
+      const skills = scanLocalSkills(validatedPath)
+      ipcLog.info(`SKILLS_SCAN_LOCAL: Found ${skills.length} local skills`)
+      return skills
+    } catch (error) {
+      ipcLog.error('[SKILLS_SCAN_LOCAL] Error scanning local skills:', error)
+      return []
+    }
+  })
+
   // Import a skill from global directories (create symlink)
   ipcMain.handle(IPC_CHANNELS.SKILLS_IMPORT, async (_event, workspaceId: string, sourcePath: string, slug: string) => {
     ipcLog.info(`SKILLS_IMPORT: Importing skill "${slug}" from ${sourcePath} to workspace ${workspaceId}`)

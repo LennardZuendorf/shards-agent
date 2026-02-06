@@ -66,10 +66,11 @@ mac:
       arch:
         - arm64
         - x64
-  hardenedRuntime: true
+  # Local dev: disable hardened runtime and custom entitlements so build works without signing
+  hardenedRuntime: false
   gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
+  entitlements: null
+  entitlementsInherit: null
   # Exclude ripgrep binaries for other platforms
   files:
     - "!node_modules/@anthropic-ai/claude-agent-sdk/vendor/ripgrep/arm64-linux"

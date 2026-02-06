@@ -26,6 +26,12 @@ export interface MentionSection {
   id: string
   label: string
   items: MentionItem[]
+  /** Optional metadata for the section */
+  meta?: {
+    hasConflicts?: boolean
+    conflictCount?: number
+    [key: string]: unknown
+  }
 }
 
 export interface InlineMentionMenuProps {
@@ -142,6 +148,25 @@ function flattenItems(sections: MentionSection[]): MentionItem[] {
 }
 
 /**
+ * Flatten sections into items with section headers inserted between sections.
+ * Used when rendering without filter to show organized sections.
+ */
+type FlatListItem = MentionItem | { type: 'section-header'; sectionId: string; label: string; meta?: MentionSection['meta'] }
+
+function flattenWithHeaders(sections: MentionSection[]): FlatListItem[] {
+  const result: FlatListItem[] = []
+  sections.forEach((section, index) => {
+    if (section.items.length === 0) return
+    // Add separator before each section except the first
+    if (index > 0) {
+      result.push({ type: 'section-header', sectionId: section.id, label: section.label, meta: section.meta })
+    }
+    result.push(...section.items)
+  })
+  return result
+}
+
+/**
  * Check if the @ character at the given position is a valid mention trigger.
  * Valid triggers are:
  * - @ at the start of input (position 0)
@@ -184,7 +209,9 @@ export function InlineMentionMenu({
   const listRef = React.useRef<HTMLDivElement>(null)
   const [selectedIndex, setSelectedIndex] = React.useState(0)
   const filteredSections = filterSections(sections, filter)
-  const flatItems = flattenItems(filteredSections)
+  // Use headers when no filter, flatten when filtering
+  const flatList = filter ? flattenItems(filteredSections) : flattenWithHeaders(filteredSections)
+  const flatItems = flatList.filter((item): item is MentionItem => 'type' in item && item.type !== 'section-header')
 
   // Reset selection when filter changes
   React.useEffect(() => {
@@ -275,7 +302,27 @@ export function InlineMentionMenu({
         {flatItems.length === 0 && filter && (
           <div className="px-3 py-2 text-[12px] text-muted-foreground/60">No results</div>
         )}
-        {flatItems.map((item, itemIndex) => {
+        {flatList.map((listItem, listIndex) => {
+          // Section header
+          if ('type' in listItem && listItem.type === 'section-header') {
+            return (
+              <div key={`section-${listItem.sectionId}`}>
+                <div className="border-t border-foreground/5 my-1" />
+                <div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                  {listItem.label}
+                </div>
+                {listItem.sectionId === 'local-skills' && listItem.meta?.hasConflicts && (
+                  <div className="px-3 pb-1 text-[11px] text-warning">
+                    ⚠️ {listItem.meta.conflictCount} local skill{listItem.meta.conflictCount !== 1 ? 's' : ''} hidden (conflicts with workspace)
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          // Regular item
+          const item = listItem as MentionItem
+          const itemIndex = flatItems.findIndex(fi => fi.id === item.id)
           const isSelected = itemIndex === selectedIndex
 
           return (
@@ -293,9 +340,14 @@ export function InlineMentionMenu({
               )}
             >
               {/* Icon based on type */}
-              <div className="shrink-0">
+              <div className="shrink-0 relative">
                 {item.type === 'skill' && item.skill && (
-                  <SkillAvatar skill={item.skill} size="sm" workspaceId={workspaceId} />
+                  <>
+                    <SkillAvatar skill={item.skill} size="sm" workspaceId={workspaceId} />
+                    {item.skill.hasBrokenFrontmatter && (
+                      <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-warning" title="Missing or incomplete frontmatter (name/description)" />
+                    )}
+                  </>
                 )}
                 {item.type === 'source' && item.source && (
                   <SourceAvatar source={item.source} size="sm" />
@@ -418,6 +470,10 @@ export interface UseInlineMentionOptions {
   inputRef: React.RefObject<MentionInputElement | null>
   skills: LoadedSkill[]
   sources: LoadedSource[]
+  /** Local skills from working directory */
+  localSkills?: LoadedSkill[]
+  /** Conflicting local skill slugs (hidden from display) */
+  localSkillConflicts?: string[]
   /** Base path for file search (working directory) */
   basePath?: string
   onSelect: (item: MentionItem) => void
@@ -441,6 +497,8 @@ export function useInlineMention({
   inputRef,
   skills,
   sources,
+  localSkills,
+  localSkillConflicts,
   basePath,
   onSelect,
   workspaceId,
@@ -516,8 +574,27 @@ export function useInlineMention({
       })
     }
 
+    // Local skills section (from working directory)
+    if (localSkills && localSkills.length > 0) {
+      result.push({
+        id: 'local-skills',
+        label: 'Locally Sourced',
+        items: localSkills.map(skill => ({
+          id: skill.slug,
+          type: 'skill' as const,
+          label: skill.metadata.name,
+          description: skill.metadata.description,
+          skill,
+        })),
+        meta: {
+          hasConflicts: (localSkillConflicts?.length ?? 0) > 0,
+          conflictCount: localSkillConflicts?.length ?? 0,
+        },
+      })
+    }
+
     return result
-  }, [skills, sources, fileResults])
+  }, [skills, sources, fileResults, localSkills, localSkillConflicts])
 
   const handleInputChange = React.useCallback((value: string, cursorPosition: number) => {
     // Store current state for handleSelect

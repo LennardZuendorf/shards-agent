@@ -54,6 +54,7 @@ pnpm-lock.yaml
 
 # Agent memory and context files
 .memory/
+.docs/
 
 # SSH keys and secrets
 *.pem

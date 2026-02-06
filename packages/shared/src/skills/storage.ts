@@ -30,14 +30,33 @@ import {
 
 /**
  * Parse SKILL.md content and extract frontmatter + body
+ * Returns null only for completely unparseable content
+ * Missing name/description will use fallback values with hasBrokenFrontmatter flag
  */
-function parseSkillFile(content: string): { metadata: SkillMetadata; body: string } | null {
+function parseSkillFile(
+  content: string,
+  slug: string
+): { metadata: SkillMetadata; body: string; hasBrokenFrontmatter: boolean } | null {
   try {
     const parsed = matter(content);
+    let hasBrokenFrontmatter = false;
 
-    // Validate required fields
-    if (!parsed.data.name || !parsed.data.description) {
-      return null;
+    // Use fallbacks for missing required fields
+    let name = parsed.data.name as string | undefined;
+    let description = parsed.data.description as string | undefined;
+
+    if (!name) {
+      // Fallback: use slug as name (convert kebab-case to Title Case)
+      name = slug.split('-').map(word =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+      hasBrokenFrontmatter = true;
+    }
+
+    if (!description) {
+      // Fallback: use generic description
+      description = `Skill instructions for ${name}`;
+      hasBrokenFrontmatter = true;
     }
 
     // Validate and extract optional icon field
@@ -46,13 +65,14 @@ function parseSkillFile(content: string): { metadata: SkillMetadata; body: strin
 
     return {
       metadata: {
-        name: parsed.data.name as string,
-        description: parsed.data.description as string,
+        name,
+        description,
         globs: parsed.data.globs as string[] | undefined,
         alwaysAllow: parsed.data.alwaysAllow as string[] | undefined,
         icon,
       },
       body: parsed.content,
+      hasBrokenFrontmatter,
     };
   } catch {
     return null;
@@ -91,7 +111,7 @@ export function loadSkill(workspaceRoot: string, slug: string): LoadedSkill | nu
     return null;
   }
 
-  const parsed = parseSkillFile(content);
+  const parsed = parseSkillFile(content, slug);
   if (!parsed) {
     return null;
   }
@@ -102,6 +122,7 @@ export function loadSkill(workspaceRoot: string, slug: string): LoadedSkill | nu
     content: parsed.body,
     iconPath: findIconFile(skillDir),
     path: skillDir,
+    hasBrokenFrontmatter: parsed.hasBrokenFrontmatter,
   };
 }
 

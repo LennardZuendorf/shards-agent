@@ -669,6 +669,7 @@ export const IPC_CHANNELS = {
   SKILLS_OPEN_FINDER: 'skills:openFinder',
   SKILLS_CHANGED: 'skills:changed',
   SKILLS_SCAN_GLOBAL: 'skills:scanGlobal',    // Scan ~/.claude/skills and ~/.agents/skills
+  SKILLS_SCAN_LOCAL: 'skills:scanLocal',      // Scan working directory for local skills
   SKILLS_IMPORT: 'skills:import',              // Import skill (create symlink)
 
   // Status management (workspace-scoped)
@@ -954,6 +955,8 @@ export interface ElectronAPI {
   openSkillInFinder(workspaceId: string, skillSlug: string): Promise<void>
   // Global skills import
   scanGlobalSkills(): Promise<LoadedSkill[]>
+  // Local skills scanning (from working directory)
+  scanLocalSkills(workingDirectory: string): Promise<LoadedSkill[]>
   importSkill(workspaceId: string, sourcePath: string, slug: string): Promise<import('@craft-agent/shared/skills').ImportResult>
 
   // Skills change listener (live updates when skills are added/removed/modified)

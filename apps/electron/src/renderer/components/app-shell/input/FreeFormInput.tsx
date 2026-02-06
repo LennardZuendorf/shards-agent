@@ -32,6 +32,7 @@ import {
   useInlineLabelMenu,
 } from '@/components/ui/label-menu'
 import type { LabelConfig } from '@craft-agent/shared/labels'
+import { useLocalSkills } from '@/hooks/useLocalSkills'
 import { parseMentions } from '@/lib/mentions'
 import { RichTextInput, type RichTextInputHandle } from '@/components/ui/rich-text-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@craft-agent/ui'
@@ -659,6 +660,9 @@ export function FreeFormInput({
     homeDir,
   })
 
+  // Local skills from working directory
+  const { localSkills, conflicts } = useLocalSkills(workingDirectory, skills || [])
+
   // Handle mention selection (sources, skills, files)
   const handleMentionSelect = React.useCallback((item: MentionItem) => {
     // For sources: enable the source immediately
@@ -675,11 +679,13 @@ export function FreeFormInput({
     // Skills also don't need special handling beyond text insertion.
   }, [optimisticSourceSlugs, onSourcesChange])
 
-  // Inline mention hook (for skills, sources, and files)
+  // Inline mention hook (for skills, sources, files, and local skills)
   const inlineMention = useInlineMention({
     inputRef: richInputRef,
     skills,
     sources,
+    localSkills,
+    localSkillConflicts: conflicts,
     basePath: workingDirectory,
     onSelect: handleMentionSelect,
     workspaceId,
@@ -948,7 +954,7 @@ export function FreeFormInput({
     if (disableSend) return false
 
     // Parse all @mentions (skills, sources, folders)
-    const skillSlugs = skills.map(s => s.slug)
+    const skillSlugs = [...skills.map(s => s.slug), ...localSkills.map(s => s.slug)]
     const sourceSlugs = sources.map(s => s.config.slug)
     const mentions = parseMentions(input, skillSlugs, sourceSlugs)
 
@@ -979,7 +985,7 @@ export function FreeFormInput({
     })
 
     return true
-  }, [input, attachments, disabled, disableSend, onInputChange, onSubmit, skills, sources, optimisticSourceSlugs, onSourcesChange, onWorkingDirectoryChange, homeDir])
+  }, [input, attachments, disabled, disableSend, onInputChange, onSubmit, skills, localSkills, sources, optimisticSourceSlugs, onSourcesChange, onWorkingDirectoryChange, homeDir])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1296,7 +1302,7 @@ export function FreeFormInput({
           }}
           placeholder={shuffledPlaceholder}
           disabled={disabled}
-          skills={skills}
+          skills={[...skills, ...localSkills]}
           sources={sources}
           workspaceId={workspaceId}
           className="pl-5 pr-4 pt-4 pb-3 overflow-y-auto min-h-[88px]"
