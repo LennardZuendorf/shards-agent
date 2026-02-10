@@ -1,308 +1,148 @@
-# Craft Agents
+# Shards
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
-## How it Works (Video)
-To understand what Craft Agents does and how it works watch this video.
+**An agentic, minimal note-taking and second brain tool.**
 
-[![Demo Video](https://img.youtube.com/vi/xQouiAIilvU/hqdefault.jpg)](https://www.youtube.com/watch?v=xQouiAIilvU)
+Shards is a fork of [Craft Agents](https://github.com/lukilabs/craft-agents-oss) that extends the agent-native desktop experience with a built-in tiptap v3 markdown editor, file tree sidebar, and a note-taking-first workflow. Write markdown, organize your notes, and let Claude help you think — all in one window.
 
-[Click Here (or on the image above) to watch the video on YouTube →](https://www.youtube.com/watch?v=xQouiAIilvU)
+> Think of it as: **Craft Agents + a real editor = an AI-powered second brain.**
 
+---
 
-## Why Craft Agents was built
-Craft Agents is a tool we built so that we (at craft.do) can work effectively with agents. It enables intuitive multitasking, no-fluff connection to any API or Service, sharing sessions, and a more document (vs code) centric workflow - in a beautiful and fluid UI.
+## Why Shards?
 
-It leans on Claude Code through the Claude Agent SDK - follows what we found great, and improves areas where we've desired improvements.
+Craft Agents is great for agent-centric workflows — multi-session inbox, MCP integrations, skills, and a beautiful chat UI. But it has no editor. You chat with the agent, and it works on files externally.
 
-It's built with Agent Native software principles in mind, and is highly customisable out of the box. One of the first of its kind.
+Shards fills that gap:
 
-Craft Agents is open source under the Apache 2.0 license - so you are free to remix, change anything. And that's actually possible. We ourselves are building Craft Agents with Craft Agents only - no code editors - so really, any customisation is just a prompt away.
+- **Editor-first, agent-assisted.** A tiptap v3 WYSIWYG markdown editor is the main panel. The agent chat sidebar assists your writing.
+- **Local-first notes.** Plain `.md` files on disk. No proprietary format, no database, no sync.
+- **Second brain.** Unlike a generic agent chat, Shards is purpose-built for note-taking, writing, and knowledge management — with AI as a thinking partner.
+- **Everything Craft Agents has.** Session management, MCP sources, skills, permissions, theming — all inherited from the upstream fork.
 
-We built Craft Agents because we wanted a better, more opinionated (and preferably non-CLI way) of working with the most powerful agents in the world. We'll continue to improve it, based on our experiences and intuition.
+---
 
-<img width="1578" height="894" alt="image" src="https://github.com/user-attachments/assets/3f1f2fe8-7cf6-4487-99ff-76f6c8c0a3fb" />
+## What Shards Adds to Craft Agents
 
-## Things that are hard to believe "just work"
+| Feature | Craft Agents | Shards |
+|---------|-------------|--------|
+| Agent chat | Multi-session inbox | Multi-session inbox (inherited) |
+| Editor | None | tiptap v3 WYSIWYG markdown editor |
+| File management | File attachments only | Full file tree sidebar (`.md` files) |
+| Workflow | Chat-first, document-centric | Editor-first, agent-assisted |
+| File format | Session JSONL | Plain `.md` files on disk + session JSONL |
+| Agent→file sync | N/A | Agent edits files, editor reflects changes live |
+| Frontmatter | N/A | YAML frontmatter preserved (stripped from editor, re-prepended on save) |
 
-**How do I connect to Linear, Gmail, Slack...?**
-Tell the agent "add Linear as a source." It finds public APIs and MCP servers, reads their docs, sets up credentials, and configures everything. No config files, no setup wizards.
+---
 
-[Check out how I just connected to Slack →](https://agents.craft.do/s/DRNQEiy8w2e1v5LPgKl8b)
+## Features
 
-**I already have my MCP config JSON.**
-Paste it. The agent handles the rest.
+### Inherited from Craft Agents
+- **Multi-Session Inbox**: Session management, status workflow, and flagging
+- **Claude Agent SDK**: Streaming responses, tool visualization, real-time updates
+- **Sources**: Connect to MCP servers, REST APIs, local filesystems
+- **Permission Modes**: Three-level system (Explore, Ask to Edit, Auto)
+- **Skills**: Specialized agent instructions per-workspace
+- **Theme System**: Cascading themes at app and workspace levels
+- **File Attachments**: Drag-drop images, PDFs, Office documents
 
-**What about local MCPs?**
-Fully supported. Stdio-based MCP servers run as local subprocesses on your machine. Point it at an npx command, a Python script, or any local binary. It just works.
+### New in Shards
+- **Markdown Editor**: tiptap v3 WYSIWYG editor with full GFM support (headings, bold, italic, code blocks, tables, task lists, highlights)
+- **File Tree Sidebar**: Browse and manage `.md` files in your workspace folder
+- **BubbleMenu**: Floating inline formatting toolbar on text selection
+- **Syntax Highlighting**: Code blocks with language detection via lowlight/highlight.js
+- **Frontmatter Support**: YAML frontmatter preserved transparently (via gray-matter)
+- **Agent → Editor Sync**: Agent edits files on disk, editor reloads live
+- **Word/Character Count**: Status bar with live counts via tiptap CharacterCount
+- **Smart Typography**: Auto-replace quotes, dashes, arrows, fractions
 
-**Can it handle custom APIs?**
-Yes. Paste an OpenAPI spec, some endpoint URLs, screenshots of docs, whatever you have. It figures it out and guides you through the rest.
-
-**APIs too? Not just MCPs?**
-Craft Agents connects to anything. We have it hooked up to a direct Postgres DB behind a jumpbox. Skills + Sources = magic.
-
-**How do I import my Claude Code skills and MCPs?**
-Tell the agent you want to import your skills from Claude Code. It handles the migration.
-
-[Here I imported all my skills in one go →](https://agents.craft.do/s/gWCFqwhObFWaNJIEJmd6j)
-
-**How do I create a new skill?**
-Describe what the skill should do, give it context. The agent takes care of the rest.
-
-**Do I need to restart after changes?**
-No. Everything is instant. Mention new skills or sources with `@`, even mid-conversation.
-
-**So I can just ask it anything?**
-Yes. That's the core idea behind agent-native software. You describe what you want, and it figures out how. That's a good use of tokens.
-
+---
 
 ## Installation
-
-### One-Line Install (Recommended)
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://agents.craft.do/install-app.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://agents.craft.do/install-app.ps1 | iex
-```
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/lukilabs/craft-agents-oss.git
-cd craft-agents-oss
+git clone https://github.com/yourusername/shards.git
+cd shards
 bun install
 bun run electron:start
 ```
 
-## Features
+### Development
 
-- **Multi-Session Inbox**: Desktop app with session management, status workflow, and flagging
-- **Claude Code Experience**: Streaming responses, tool visualization, real-time updates
-- **Craft MCP Integration**: Access to 32+ Craft document tools (blocks, collections, search, tasks)
-- **Sources**: Connect to MCP servers, REST APIs (Google, Slack, Microsoft), and local filesystems
-- **Permission Modes**: Three-level system (Explore, Ask to Edit, Auto) with customizable rules
-- **Background Tasks**: Run long-running operations with progress tracking
-- **Dynamic Status System**: Customizable session workflow states (Todo, In Progress, Done, etc.)
-- **Theme System**: Cascading themes at app and workspace levels
-- **Multi-File Diff**: VS Code-style window for viewing all file changes in a turn
-- **Skills**: Specialized agent instructions stored per-workspace
-- **File Attachments**: Drag-drop images, PDFs, Office documents with auto-conversion
+```bash
+bun run electron:dev              # Hot reload development
+bun run electron:start            # Build and run
+bun run typecheck:all             # Type check all packages
+bun run lint                      # Lint all packages
+bun run lint:fix                  # Auto-fix lint issues
+```
 
-## Quick Start
-
-1. **Launch the app** after installation
-2. **Choose API Connection**: Use your own Anthropic API key or Claude Max subscription
-3. **Create a workspace**: Set up a workspace to organize your sessions
-4. **Connect sources** (optional): Add MCP servers, REST APIs, or local filesystems
-5. **Start chatting**: Create sessions and interact with Claude
-
-## Desktop App Features
-
-### Session Management
-
-- **Inbox/Archive**: Sessions organized by workflow status
-- **Flagging**: Mark important sessions for quick access
-- **Status Workflow**: Todo → In Progress → Needs Review → Done
-- **Session Naming**: AI-generated titles or manual naming
-- **Session Persistence**: Full conversation history saved to disk
-
-### Sources
-
-Connect external data sources to your workspace:
-
-| Type | Examples |
-|------|----------|
-| **MCP Servers** | Craft, Linear, GitHub, Notion, custom servers |
-| **REST APIs** | Google (Gmail, Calendar, Drive), Slack, Microsoft |
-| **Local Files** | Filesystem, Obsidian vaults, Git repos |
-
-### Permission Modes
-
-| Mode | Display | Behavior |
-|------|---------|----------|
-| `safe` | Explore | Read-only, blocks all write operations |
-| `ask` | Ask to Edit | Prompts for approval (default) |
-| `allow-all` | Auto | Auto-approves all commands |
-
-Use **SHIFT+TAB** to cycle through modes in the chat interface.
-
-### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+N` | New chat |
-| `Cmd+1/2/3` | Focus sidebar/list/chat |
-| `Cmd+/` | Keyboard shortcuts dialog |
-| `SHIFT+TAB` | Cycle permission modes |
-| `Enter` | Send message |
-| `Shift+Enter` | New line |
+---
 
 ## Architecture
 
+Shards extends Craft Agents' monorepo structure with editor components:
+
 ```
-craft-agent/
+shards/
 ├── apps/
-│   └── electron/              # Desktop GUI (primary)
+│   └── electron/                  # Desktop GUI (extended)
 │       └── src/
-│           ├── main/          # Electron main process
-│           ├── preload/       # Context bridge
-│           └── renderer/      # React UI (Vite + shadcn)
+│           ├── main/              # Electron main process
+│           │   └── services/
+│           │       └── files.ts   # NEW: File I/O, frontmatter, file watching
+│           ├── preload/           # Context bridge (extended)
+│           └── renderer/          # React UI (extended)
+│               └── src/
+│                   ├── components/
+│                   │   ├── tiptap/     # NEW: tiptap UI components (SCSS)
+│                   │   ├── editor/     # NEW: Editor.tsx, EditorToolbar.tsx
+│                   │   ├── filetree/   # NEW: FileTree.tsx, FileNode.tsx
+│                   │   └── ...         # Existing Craft Agents components
+│                   └── atoms/
+│                       └── editor.ts   # NEW: Editor state atoms
 └── packages/
-    ├── core/                  # Shared types
-    └── shared/                # Business logic
-        └── src/
-            ├── agent/         # CraftAgent, permissions
-            ├── auth/          # OAuth, tokens
-            ├── config/        # Storage, preferences, themes
-            ├── credentials/   # AES-256-GCM encrypted storage
-            ├── sessions/      # Session persistence
-            ├── sources/       # MCP, API, local sources
-            └── statuses/      # Dynamic status system
+    ├── core/                      # @craft-agent/core (inherited)
+    └── shared/                    # @craft-agent/shared (inherited)
 ```
 
-## Development
+---
 
-```bash
-# Hot reload development
-bun run electron:dev
+## Documentation
 
-# Build and run
-bun run electron:start
+| Document | What it covers |
+|----------|---------------|
+| `PRD.md` | Product requirements, user stories, features, phases |
+| `CORE_SPECS.md` | Infrastructure — file I/O service, IPC extensions, editor state, theming bridge |
+| `EDITOR_SPECS.md` | Editor & UI — tiptap v3 extensions, toolbar, BubbleMenu, markdown I/O, file tree |
+| `AGENT_SPECS.md` | Agent extensions — agent→editor sync, "send current file", session integration |
+| `TECHNICAL_DESIGN.md` | Technical design — what we build vs. what we inherit, dependency summary |
 
-# Type checking
-bun run typecheck:all
-
-# Debug logging (writes to ~/Library/Logs/Craft Agents/)
-# Logs are automatically enabled in development
-```
-
-### Environment Variables
-
-OAuth integrations (Slack, Microsoft) require credentials baked into the build. Create a `.env` file:
-
-```bash
-MICROSOFT_OAUTH_CLIENT_ID=your-client-id
-SLACK_OAUTH_CLIENT_ID=your-slack-client-id
-SLACK_OAUTH_CLIENT_SECRET=your-slack-client-secret
-```
-
-**Note:** Google OAuth credentials are NOT baked into the build. Users provide their own credentials via source configuration. See the [Google OAuth Setup](#google-oauth-setup-gmail-calendar-drive) section below.
-
-### Google OAuth Setup (Gmail, Calendar, Drive)
-
-Google integrations require you to create your own OAuth credentials. This is a one-time setup.
-
-#### 1. Create a Google Cloud Project
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project (or select an existing one)
-3. Note your Project ID
-
-#### 2. Enable Required APIs
-
-Go to **APIs & Services → Library** and enable the APIs you need:
-- **Gmail API** - for email integration
-- **Google Calendar API** - for calendar integration
-- **Google Drive API** - for file storage integration
-
-#### 3. Configure OAuth Consent Screen
-
-1. Go to **APIs & Services → OAuth consent screen**
-2. Select **External** user type (unless you have Google Workspace)
-3. Fill in required fields:
-   - App name: e.g., "My Craft Agent"
-   - User support email: your email
-   - Developer contact: your email
-4. Add scopes (optional - can leave default)
-5. Add yourself as a test user (required for External apps in testing mode)
-6. Complete the wizard
-
-#### 4. Create OAuth Credentials
-
-1. Go to **APIs & Services → Credentials**
-2. Click **Create Credentials → OAuth Client ID**
-3. Application type: **Desktop app**
-4. Name: e.g., "Craft Agent Desktop"
-5. Click **Create**
-6. Note the **Client ID** and **Client Secret**
-
-#### 5. Configure in Craft Agent
-
-When setting up a Google source (Gmail, Calendar, Drive), add these fields to your source's `config.json`:
-
-```json
-{
-  "api": {
-    "googleService": "gmail",
-    "googleOAuthClientId": "your-client-id.apps.googleusercontent.com",
-    "googleOAuthClientSecret": "your-client-secret"
-  }
-}
-```
-
-Or simply tell the agent you want to connect Gmail/Calendar/Drive - it will guide you through entering your credentials.
-
-#### Security Notes
-
-- Your OAuth credentials are stored encrypted alongside other source credentials
-- Never commit credentials to version control
-- For production use, consider getting your OAuth consent screen verified by Google
-
-## Configuration
-
-Configuration is stored at `~/.craft-agent/`:
-
-```
-~/.craft-agent/
-├── config.json              # Main config (workspaces, auth type)
-├── credentials.enc          # Encrypted credentials (AES-256-GCM)
-├── preferences.json         # User preferences
-├── theme.json               # App-level theme
-└── workspaces/
-    └── {id}/
-        ├── config.json      # Workspace settings
-        ├── theme.json       # Workspace theme override
-        ├── sessions/        # Session data (JSONL)
-        ├── sources/         # Connected sources
-        ├── skills/          # Custom skills
-        └── statuses/        # Status configuration
-```
-
-## Advanced Features
-
-### Large Response Handling
-
-Tool responses exceeding ~60KB are automatically summarized using Claude Haiku with intent-aware context. The `_intent` field is injected into MCP tool schemas to preserve summarization focus.
-
-### Deep Linking
-
-External apps can navigate using `craftagents://` URLs:
-
-```
-craftagents://allChats                    # All chats view
-craftagents://allChats/chat/session123    # Specific chat
-craftagents://settings                    # Settings
-craftagents://sources/source/github       # Source info
-craftagents://action/new-chat             # Create new chat
-```
+---
 
 ## Tech Stack
 
+Everything from Craft Agents, plus:
+
 | Layer | Technology |
 |-------|------------|
-| Runtime | [Bun](https://bun.sh/) |
-| AI | [@anthropic-ai/claude-agent-sdk](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) |
-| Desktop | [Electron](https://www.electronjs.org/) + React |
-| UI | [shadcn/ui](https://ui.shadcn.com/) + Tailwind CSS v4 |
-| Build | esbuild (main) + Vite (renderer) |
-| Credentials | AES-256-GCM encrypted file storage |
+| Editor | tiptap v3 + @tiptap/markdown + CodeBlockLowlight |
+| Editor UI | tiptap UI Components (Simple Editor template, SCSS) |
+| Frontmatter | gray-matter |
+| Editor styling | tiptap SCSS + shared CSS custom properties (`--shards-*`) |
+
+See the upstream [Craft Agents README](https://github.com/lukilabs/craft-agents-oss) for the full base tech stack.
+
+---
+
+## Credits
+
+Shards is built on top of [Craft Agents](https://github.com/lukilabs/craft-agents-oss) by [Luki Labs / Craft Docs](https://craft.do). The agent infrastructure, session management, MCP integration, permissions system, and UI foundation are all inherited from Craft Agents.
 
 ## License
 
@@ -310,26 +150,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ### Third-Party Licenses
 
-This project uses the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk), which is subject to [Anthropic's Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms).
+- [Craft Agents](https://github.com/lukilabs/craft-agents-oss) — Apache 2.0
+- [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) — subject to [Anthropic's Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms)
 
 ### Trademark
 
 "Craft" and "Craft Agents" are trademarks of Craft Docs Ltd. See [TRADEMARK.md](TRADEMARK.md) for usage guidelines.
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## Security
-
-### Local MCP Server Isolation
-
-When spawning local MCP servers (stdio transport), sensitive environment variables are filtered out to prevent credential leakage to subprocesses. Blocked variables include:
-
-- `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` (app auth)
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
-- `GITHUB_TOKEN`, `GH_TOKEN`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `STRIPE_SECRET_KEY`, `NPM_TOKEN`
-
-To explicitly pass an env var to a specific MCP server, use the `env` field in the source config.
-
-To report security vulnerabilities, please see [SECURITY.md](SECURITY.md).
