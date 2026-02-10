@@ -133,6 +133,7 @@ export function SourcesListPanel({
         <div className="pt-2">
           {filteredSources.map((source, index) => (
             <SourceItem
+              // eslint-disable-next-line craft-sources/no-inline-source-auth-check -- used only as React key for re-rendering, not auth logic
               key={`${source.config.slug}-${source.config.connectionStatus}-${source.config.isAuthenticated}-${localMcpEnabled}`}
               source={source}
               isSelected={selectedSourceSlug === source.config.slug}

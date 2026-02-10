@@ -162,10 +162,12 @@ export function deriveConnectionStatus(source: {
   const requiresAuth = (mcp?.authType && mcp.authType !== 'none') ||
                        (api?.authType && api.authType !== 'none')
 
+  // eslint-disable-next-line craft-sources/no-inline-source-auth-check -- deriving connection status requires checking auth directly
   if (requiresAuth && !source.config.isAuthenticated) {
     return 'needs_auth'
   }
 
+  // eslint-disable-next-line craft-sources/no-inline-source-auth-check -- deriving connection status requires checking auth directly
   if (source.config.isAuthenticated) {
     return 'connected'
   }

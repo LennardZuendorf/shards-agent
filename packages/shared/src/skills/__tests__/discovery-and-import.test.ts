@@ -294,7 +294,7 @@ describe('integration: scan and import', () => {
     expect(globalSkills.length).toBe(2);
     
     // Import one skill
-    const skillToImport = globalSkills[0];
+    const skillToImport = globalSkills[0]!;
     const result = await importSkill(skillToImport.path, skillToImport.slug, workspaceRoot);
     
     expect(result.success).toBe(true);

@@ -156,7 +156,7 @@ export class TokenRefreshManager {
     const mcpOAuthSources = sources.filter(source =>
       source.config.type === 'mcp' &&
       source.config.mcp?.authType === 'oauth' &&
-      source.config.isAuthenticated
+      source.config.isAuthenticated // eslint-disable-line craft-shared/no-inline-source-auth-check -- filtering within oauth-specific context, isSourceUsable() checks enabled which is wrong here
     );
 
     if (mcpOAuthSources.length === 0) {
