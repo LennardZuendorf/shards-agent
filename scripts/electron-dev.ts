@@ -5,7 +5,7 @@
 
 import { spawn, type Subprocess } from "bun";
 import { existsSync, rmSync, cpSync, readFileSync, statSync, mkdirSync } from "fs";
-import { join } from "path";
+import { join, basename } from "path";
 import * as esbuild from "esbuild";
 
 const ROOT_DIR = join(import.meta.dir, "..");
@@ -23,6 +23,26 @@ const IS_WINDOWS = process.platform === "win32";
 const BIN_EXT = IS_WINDOWS ? ".exe" : "";
 const VITE_BIN = join(ROOT_DIR, `node_modules/.bin/vite${BIN_EXT}`);
 const ELECTRON_BIN = join(ROOT_DIR, `node_modules/.bin/electron${BIN_EXT}`);
+
+// Multi-instance detection (matches detect-instance.sh logic)
+// Detects instance number from folder name suffix (e.g., craft-agents-1 → instance 1)
+function detectInstance(): void {
+  // Don't override if already set (e.g., by sourcing detect-instance.sh first)
+  if (process.env.CRAFT_VITE_PORT) return;
+
+  const folderName = basename(ROOT_DIR);
+  const match = folderName.match(/-(\d+)$/);
+
+  if (match) {
+    const instanceNum = match[1];
+    process.env.CRAFT_INSTANCE_NUMBER = instanceNum;
+    process.env.CRAFT_VITE_PORT = `${instanceNum}173`;
+    process.env.CRAFT_APP_NAME = `Craft Agents [${instanceNum}]`;
+    process.env.CRAFT_CONFIG_DIR = join(process.env.HOME || "", `.craft-agent-${instanceNum}`);
+    process.env.CRAFT_DEEPLINK_SCHEME = `craftagents${instanceNum}`;
+    console.log(`🔢 Instance ${instanceNum} detected: port=${process.env.CRAFT_VITE_PORT}, config=${process.env.CRAFT_CONFIG_DIR}`);
+  }
+}
 
 // Load .env file if it exists
 function loadEnvFile(): void {
@@ -137,41 +157,32 @@ async function buildMcpServers(): Promise<void> {
   if (!existsSync(sessionDistDir)) mkdirSync(sessionDistDir, { recursive: true });
   if (!existsSync(bridgeDistDir)) mkdirSync(bridgeDistDir, { recursive: true });
 
-  // Build both servers in parallel (fall back to pre-built bundles if source not available)
-  const sessionSource = join(SESSION_SERVER_DIR, "src/index.ts");
-  const bridgeSource = join(BRIDGE_SERVER_DIR, "src/index.ts");
-  const sessionPrebuilt = join(ELECTRON_DIR, "resources/session-mcp-server/index.js");
-  const bridgePrebuilt = join(ELECTRON_DIR, "resources/bridge-mcp-server/index.js");
+  // Build both servers in parallel
+  const [sessionResult, bridgeResult] = await Promise.all([
+    runEsbuild(
+      "packages/session-mcp-server/src/index.ts",
+      "packages/session-mcp-server/dist/index.js",
+      {},
+      { packagesExternal: true }
+    ),
+    runEsbuild(
+      "packages/bridge-mcp-server/src/index.ts",
+      "packages/bridge-mcp-server/dist/index.js",
+      {},
+      { packagesExternal: true }
+    ),
+  ]);
 
-  const builds: Promise<{ success: boolean; error?: string }>[] = [];
-
-  if (existsSync(sessionSource)) {
-    builds.push(runEsbuild("packages/session-mcp-server/src/index.ts", "packages/session-mcp-server/dist/index.js"));
-  } else if (existsSync(sessionPrebuilt)) {
-    const { copyFileSync } = await import("fs");
-    copyFileSync(sessionPrebuilt, SESSION_SERVER_OUTPUT);
-    console.log("📦 Using pre-built session MCP server from resources");
-  } else {
-    console.warn("⚠️  Session MCP server source not found, skipping");
+  if (!sessionResult.success) {
+    console.error("❌ Session MCP server build failed:", sessionResult.error);
+    process.exit(1);
   }
 
-  if (existsSync(bridgeSource)) {
-    builds.push(runEsbuild("packages/bridge-mcp-server/src/index.ts", "packages/bridge-mcp-server/dist/index.js"));
-  } else if (existsSync(bridgePrebuilt)) {
-    const { copyFileSync } = await import("fs");
-    copyFileSync(bridgePrebuilt, BRIDGE_SERVER_OUTPUT);
-    console.log("📦 Using pre-built bridge MCP server from resources");
-  } else {
-    console.warn("⚠️  Bridge MCP server source not found, skipping");
+  if (!bridgeResult.success) {
+    console.error("❌ Bridge MCP server build failed:", bridgeResult.error);
+    process.exit(1);
   }
 
-  const results = await Promise.all(builds);
-  for (const result of results) {
-    if (!result.success) {
-      console.error("❌ MCP server build failed:", result.error);
-      process.exit(1);
-    }
-  }
   console.log("✅ MCP servers ready");
 }
 
@@ -216,7 +227,8 @@ function getElectronEnv(): Record<string, string> {
 async function runEsbuild(
   entryPoint: string,
   outfile: string,
-  defines: Record<string, string> = {}
+  defines: Record<string, string> = {},
+  options: { packagesExternal?: boolean } = {}
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await esbuild.build({
@@ -226,7 +238,7 @@ async function runEsbuild(
       format: "cjs",
       outfile: join(ROOT_DIR, outfile),
       external: ["electron"],
-      packages: "external", // Mark all node_modules as external
+      ...(options.packagesExternal ? { packages: "external" as const } : {}),
       define: defines,
       logLevel: "warning",
     });
@@ -289,6 +301,7 @@ async function main(): Promise<void> {
   console.log("🚀 Starting Electron dev environment...\n");
 
   // Setup
+  detectInstance();
   loadEnvFile();
   cleanViteCache();
 
@@ -401,7 +414,6 @@ async function main(): Promise<void> {
     format: "cjs",
     outfile: join(ROOT_DIR, "apps/electron/dist/main.cjs"),
     external: ["electron"],
-    packages: "external",
     define: oauthDefines,
     logLevel: "info",
   });
@@ -417,7 +429,6 @@ async function main(): Promise<void> {
     format: "cjs",
     outfile: join(ROOT_DIR, "apps/electron/dist/preload.cjs"),
     external: ["electron"],
-    packages: "external",
     logLevel: "info",
   });
   await preloadContext.watch();

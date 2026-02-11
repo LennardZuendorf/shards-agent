@@ -41,13 +41,20 @@ Shards fills that gap:
 ## Features
 
 ### Inherited from Craft Agents
-- **Multi-Session Inbox**: Session management, status workflow, and flagging
-- **Claude Agent SDK**: Streaming responses, tool visualization, real-time updates
-- **Sources**: Connect to MCP servers, REST APIs, local filesystems
-- **Permission Modes**: Three-level system (Explore, Ask to Edit, Auto)
-- **Skills**: Specialized agent instructions per-workspace
+- **Multi-Session Inbox**: Desktop app with session management, status workflow, and flagging
+- **Claude Code Experience**: Streaming responses, tool visualization, real-time updates
+- **Multiple LLM Connections**: Add multiple AI providers and set per-workspace defaults
+- **Codex / OpenAI Support**: Run Codex-backed sessions alongside Anthropic
+- **Craft MCP Integration**: Access to 32+ Craft document tools (blocks, collections, search, tasks)
+- **Sources**: Connect to MCP servers, REST APIs (Google, Slack, Microsoft), and local filesystems
+- **Permission Modes**: Three-level system (Explore, Ask to Edit, Auto) with customizable rules
+- **Background Tasks**: Run long-running operations with progress tracking
+- **Dynamic Status System**: Customizable session workflow states (Todo, In Progress, Done, etc.)
 - **Theme System**: Cascading themes at app and workspace levels
-- **File Attachments**: Drag-drop images, PDFs, Office documents
+- **Multi-File Diff**: VS Code-style window for viewing all file changes in a turn
+- **Skills**: Specialized agent instructions stored per-workspace
+- **File Attachments**: Drag-drop images, PDFs, Office documents with auto-conversion
+- **Hooks**: Event-driven automation — run commands or create sessions on label changes, schedules, tool use, and more
 
 ### New in Shards
 - **Markdown Editor**: tiptap v3 WYSIWYG editor with full GFM support (headings, bold, italic, code blocks, tables, task lists, highlights)
@@ -66,8 +73,8 @@ Shards fills that gap:
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/shards.git
-cd shards
+git clone https://github.com/LennardZuendorf/shards-agent.git
+cd shards-agent
 bun install
 bun run electron:start
 ```
@@ -81,6 +88,21 @@ bun run typecheck:all             # Type check all packages
 bun run lint                      # Lint all packages
 bun run lint:fix                  # Auto-fix lint issues
 ```
+
+**Debug logging** (writes to `~/Library/Logs/Craft Agents/`):
+Logs are automatically enabled in development mode.
+
+### Environment Variables
+
+OAuth integrations (Slack, Microsoft) require credentials baked into the build. Create a `.env` file:
+
+```bash
+MICROSOFT_OAUTH_CLIENT_ID=your-client-id
+SLACK_OAUTH_CLIENT_ID=your-slack-client-id
+SLACK_OAUTH_CLIENT_SECRET=your-slack-client-secret
+```
+
+**Note:** Google OAuth credentials are NOT baked into the build. Users provide their own credentials via source configuration.
 
 ---
 
@@ -123,6 +145,85 @@ shards/
 | `AGENT_SPECS.md` | Agent extensions — agent→editor sync, "send current file", session integration |
 | `TECHNICAL_DESIGN.md` | Technical design — what we build vs. what we inherit, dependency summary |
 
+**Sub-package docs (inherited from Craft Agents):**
+| Document | What it covers |
+|----------|---------------|
+| `apps/electron/AGENTS.md` | Electron app architecture, IPC patterns, renderer patterns, security |
+| `packages/shared/AGENTS.md` | Core business logic — CraftAgent, permissions, sessions, MCP, skills, statuses |
+| `packages/core/CLAUDE.md` | Shared types — workspace, session, message types |
+
+**Always check the relevant spec before implementing.** The Shards specs are the source of truth for editor/note-taking features. The Craft Agents sub-package docs are the source of truth for agent infrastructure.
+
+---
+
+## Configuration
+
+Configuration is stored at `~/.craft-agent/`:
+
+```
+~/.craft-agent/
+├── config.json              # Main config (workspaces, LLM connections)
+├── credentials.enc          # Encrypted credentials (AES-256-GCM)
+├── preferences.json         # User preferences
+├── theme.json               # App-level theme
+└── workspaces/
+    └── {id}/
+        ├── config.json      # Workspace settings
+        ├── theme.json       # Workspace theme override
+        ├── hooks.json       # Event-driven automation hooks
+        ├── sessions/        # Session data (JSONL)
+        ├── sources/         # Connected sources
+        ├── skills/          # Custom skills
+        └── statuses/        # Status configuration
+```
+
+### Hooks (Automation)
+
+Hooks let you automate workflows by triggering actions when events happen — labels change, sessions start, tools run, or on a cron schedule.
+
+**Just ask the agent:**
+- "Set up a daily standup briefing every weekday at 9am"
+- "Notify me when a session is labelled urgent"
+- "Log all permission mode changes to a file"
+- "Every Friday at 5pm, summarise this week's completed tasks"
+
+Or configure manually in `~/.craft-agent/workspaces/{id}/hooks.json`:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "SchedulerTick": [
+      {
+        "cron": "0 9 * * 1-5",
+        "timezone": "America/New_York",
+        "labels": ["Scheduled"],
+        "hooks": [
+          { "type": "prompt", "prompt": "Check @github for new issues assigned to me" }
+        ]
+      }
+    ],
+    "LabelAdd": [
+      {
+        "matcher": "^urgent$",
+        "permissionMode": "allow-all",
+        "hooks": [
+          { "type": "command", "command": "osascript -e 'display notification \"Urgent session\" with title \"Craft Agent\"'" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Two hook types:**
+- **Command hooks** — run shell commands with event data as environment variables (`$CRAFT_LABEL`, `$CRAFT_SESSION_ID`, etc.)
+- **Prompt hooks** — create a new agent session with a prompt (supports `@mentions` for sources and skills)
+
+**Supported events:** `LabelAdd`, `LabelRemove`, `PermissionModeChange`, `FlagChange`, `TodoStateChange`, `SchedulerTick`, `PreToolUse`, `PostToolUse`, `SessionStart`, `SessionEnd`, and more.
+
+See the [Hooks documentation](https://agents.craft.do/docs/hooks/overview) for the full reference.
+
 ---
 
 ## Tech Stack
@@ -136,7 +237,19 @@ Everything from Craft Agents, plus:
 | Frontmatter | gray-matter |
 | Editor styling | tiptap SCSS + shared CSS custom properties (`--shards-*`) |
 
-See the upstream [Craft Agents README](https://github.com/lukilabs/craft-agents-oss) for the full base tech stack.
+**Inherited from Craft Agents:**
+
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Bun |
+| AI | @anthropic-ai/claude-agent-sdk |
+| Desktop | Electron + React 18 |
+| UI | shadcn/ui + Tailwind CSS v4 |
+| Build | esbuild (main/preload) + Vite (renderer) |
+| State | Jotai |
+| Language | TypeScript (strict) |
+
+See the upstream [Craft Agents README](https://github.com/lukilabs/craft-agents-oss) for more details on the base tech stack.
 
 ---
 
