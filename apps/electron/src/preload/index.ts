@@ -529,6 +529,16 @@ const api: ElectronAPI = {
   setDefaultLlmConnection: (slug: string) => ipcRenderer.invoke(IPC_CHANNELS.LLM_CONNECTION_SET_DEFAULT, slug),
   setWorkspaceDefaultLlmConnection: (workspaceId: string, slug: string | null) =>
     ipcRenderer.invoke(IPC_CHANNELS.LLM_CONNECTION_SET_WORKSPACE_DEFAULT, workspaceId, slug),
+
+  // Notes / File Editor (Shards)
+  notesOpen: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_OPEN, path),
+  notesSave: (path: string, content: string, frontmatter: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, path, content, frontmatter),
+  notesList: (dir: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_LIST, dir),
+  notesCreate: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_CREATE, filePath),
+  notesCreateDir: (dirPath: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_CREATE_DIR, dirPath),
+  notesRename: (oldPath: string, newPath: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_RENAME, oldPath, newPath),
+  notesDelete: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, filePath),
+  notesDeleteConfirm: (name: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE_CONFIRM, name),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

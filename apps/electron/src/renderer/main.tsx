@@ -10,6 +10,12 @@ import { windowWorkspaceIdAtom } from './atoms/sessions'
 import { Toaster } from '@/components/ui/sonner'
 import './index.css'
 
+// Dev helper: expose navigate + routes on window for DevTools console testing
+import { navigate, routes } from './lib/navigate'
+if (import.meta.env.DEV) {
+  ;(window as any).__shards = { navigate, routes }
+}
+
 // Known-harmless console messages that should NOT be sent to Sentry.
 // These are dev-mode noise or expected warnings that aren't actionable.
 const IGNORED_CONSOLE_PATTERNS = [

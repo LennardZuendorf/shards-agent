@@ -50,6 +50,16 @@
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-switch": "^1.2.6",
     "@tanstack/react-table": "^8.21.3",
+    "@tiptap/core": "^3.19.0",
+    "@tiptap/extension-highlight": "^3.19.0",
+    "@tiptap/extension-image": "^3.19.0",
+    "@tiptap/extension-list": "^3.19.0",
+    "@tiptap/extension-subscript": "^3.19.0",
+    "@tiptap/extension-superscript": "^3.19.0",
+    "@tiptap/extension-text-align": "^3.19.0",
+    "@tiptap/pm": "^3.19.0",
+    "@tiptap/react": "^3.19.0",
+    "@tiptap/starter-kit": "^3.19.0",
     "chrono-node": "^2.9.0",
     "cmdk": "^1.1.1",
     "electron-log": "^5.4.3",
@@ -60,6 +70,7 @@
     "react": "^18.3.1",
     "react-day-picker": "^9.13.0",
     "react-dom": "^18.3.1",
+    "react-hotkeys-hook": "^5.2.4",
     "react-pdf": "^10.3.0",
     "react-simple-code-editor": "^0.14.1",
     "remark": "^15.0.1",
@@ -67,5 +78,9 @@
     "strip-markdown": "^6.0.0",
     "unist-util-visit": "^5.0.0",
     "vaul": "^1.1.2"
+  },
+  "devDependencies": {
+    "sass": "^1.97.3",
+    "sass-embedded": "^1.97.3"
   }
 }

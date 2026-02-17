@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useRef, useState, useEffect, useCallback, useMemo } from "react"
-import { useAtomValue } from "jotai"
+import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { motion, AnimatePresence } from "motion/react"
 import {
   Archive,
@@ -26,6 +26,7 @@ import {
   HelpCircle,
   ExternalLink,
   Cake,
+  FileText,
 } from "lucide-react"
 import { PanelRightRounded } from "../icons/PanelRightRounded"
 import { PanelLeftRounded } from "../icons/PanelLeftRounded"
@@ -80,7 +81,6 @@ import { useAction, useActionLabel } from "@/actions"
 import { useFocusZone } from "@/hooks/keyboard"
 import { useFocusContext } from "@/context/FocusContext"
 import { getSessionTitle } from "@/utils/session"
-import { useSetAtom } from "jotai"
 import type { Session, Workspace, FileAttachment, PermissionRequest, LoadedSource, LoadedSkill, PermissionMode, SourceFilter } from "../../../shared/types"
 import { sessionMetaMapAtom, type SessionMeta } from "@/atoms/sessions"
 import { sourcesAtom } from "@/atoms/sources"
@@ -104,11 +104,14 @@ import {
   isSourcesNavigation,
   isSettingsNavigation,
   isSkillsNavigation,
+  isNotesNavigation,
   type NavigationState,
   type SessionFilter,
 } from "@/contexts/NavigationContext"
 import type { SettingsSubpage } from "../../../shared/types"
 import { SourcesListPanel } from "./SourcesListPanel"
+import { FileTree, FileTreeHeaderActions } from "@/components/filetree/FileTree"
+import { middlePanelModeAtom, currentFilePathAtom } from "@/atoms/editor"
 import { SkillsListPanel } from "./SkillsListPanel"
 import { PanelHeader } from "./PanelHeader"
 import { EditPopover, getEditConfig, type EditContextKey } from "@/components/ui/EditPopover"
@@ -516,6 +519,12 @@ function AppShellContent({
   // Effective focus mode combines prop-based (immutable) and state-based (toggleable)
   const effectiveFocusMode = isFocusedMode || isFocusModeActive
 
+  // Middle panel mode: 'filetree' (default) or 'sessions'
+  const [middlePanelMode, setMiddlePanelMode] = useAtom(middlePanelModeAtom)
+
+  // Editor state (for workspace cleanup + restoring last note)
+  const [currentFilePath, setCurrentFilePath] = useAtom(currentFilePathAtom)
+
   // What's New overlay
   const [showWhatsNew, setShowWhatsNew] = React.useState(false)
   const [releaseNotesContent, setReleaseNotesContent] = React.useState('')
@@ -796,6 +805,9 @@ function AppShellContent({
 
       // Clear focused sidebar item
       setFocusedSidebarItemId(null)
+
+      // Clear editor state (note from previous workspace)
+      setCurrentFilePath(null)
     }
 
     // Load workspace-scoped state on BOTH initial mount AND workspace switch
@@ -1519,30 +1531,44 @@ function AppShellContent({
   }, [collapsedItems, activeWorkspaceId])
 
   const handleAllSessionsClick = useCallback(() => {
+    setMiddlePanelMode('sessions')
     navigate(routes.view.allSessions())
-  }, [])
+  }, [setMiddlePanelMode])
 
   const handleFlaggedClick = useCallback(() => {
+    setMiddlePanelMode('sessions')
     navigate(routes.view.flagged())
-  }, [])
+  }, [setMiddlePanelMode])
 
   const handleArchivedClick = useCallback(() => {
+    setMiddlePanelMode('sessions')
     navigate(routes.view.archived())
-  }, [])
+  }, [setMiddlePanelMode])
 
   // Handler for individual todo state views
   const handleTodoStateClick = useCallback((stateId: TodoStateId) => {
+    setMiddlePanelMode('sessions')
     navigate(routes.view.state(stateId))
-  }, [])
+  }, [setMiddlePanelMode])
 
   // Handler for label filter views (hierarchical — includes descendant labels)
   const handleLabelClick = useCallback((labelId: string) => {
+    setMiddlePanelMode('sessions')
     navigate(routes.view.label(labelId))
-  }, [])
+  }, [setMiddlePanelMode])
 
   const handleViewClick = useCallback((viewId: string) => {
+    setMiddlePanelMode('sessions')
     navigate(routes.view.view(viewId))
-  }, [])
+  }, [setMiddlePanelMode])
+
+  // Handler for "All Notes" in sidebar — switches middle panel to file tree + restores last note
+  const handleAllNotesClick = useCallback(() => {
+    setMiddlePanelMode('filetree')
+    if (currentFilePath && activeWorkspaceId) {
+      navigate(routes.view.note(activeWorkspaceId, currentFilePath))
+    }
+  }, [setMiddlePanelMode, currentFilePath, activeWorkspaceId])
 
   // DnD handler: reorder statuses (flat list drag-and-drop)
   // Sets optimistic order immediately for instant UI feedback, then fires IPC.
@@ -1909,8 +1935,13 @@ function AppShellContent({
     }
   }, [sidebarFocused, focusedSidebarItemId, unifiedSidebarItems])
 
-  // Get title based on navigation state
+  // Get title based on middlePanelMode and navigation state
   const listTitle = React.useMemo(() => {
+    // Middle panel mode overrides for notes/sessions
+    if (middlePanelMode === 'filetree') {
+      return 'All Notes'
+    }
+
     // Sources navigator
     if (isSourcesNavigation(navState)) {
       return 'Sources'
@@ -1924,7 +1955,7 @@ function AppShellContent({
     // Settings navigator
     if (isSettingsNavigation(navState)) return 'Settings'
 
-    // Sessions navigator - use sessionFilter
+    // Sessions mode - use sessionFilter
     if (!sessionFilter) return 'All Sessions'
 
     switch (sessionFilter.kind) {
@@ -1941,7 +1972,7 @@ function AppShellContent({
       default:
         return 'All Sessions'
     }
-  }, [navState, sessionFilter, effectiveTodoStates, labelConfigs, viewConfigs])
+  }, [middlePanelMode, navState, sessionFilter, effectiveTodoStates, labelConfigs, viewConfigs])
 
   // Build recursive sidebar items from label tree.
   // Each node renders with condensed height (compact: true) since many labels expected.
@@ -2112,13 +2143,23 @@ function AppShellContent({
                   getItemProps={getSidebarItemProps}
                   focusedItemId={focusedSidebarItemId}
                   links={[
+                    // --- Notes Section (top, note-first) ---
+                    {
+                      id: "nav:allNotes",
+                      title: "All Notes",
+                      icon: FileText,
+                      variant: (middlePanelMode === 'filetree' ? "default" : "ghost") as "default" | "ghost",
+                      onClick: handleAllNotesClick,
+                    },
+                    // --- Separator ---
+                    { id: "separator:notes-sessions", type: "separator" },
                     // --- Sessions Section ---
                     {
                       id: "nav:allSessions",
                       title: "All Sessions",
                       label: String(workspaceSessionMetas.length),
                       icon: Inbox,
-                      variant: sessionFilter?.kind === 'allSessions' ? "default" : "ghost",
+                      variant: (middlePanelMode === 'sessions' && sessionFilter?.kind === 'allSessions') ? "default" : "ghost",
                       onClick: handleAllSessionsClick,
                     },
                     {
@@ -2190,7 +2231,7 @@ function AppShellContent({
                       onClick: handleArchivedClick,
                     },
                     // --- Separator ---
-                    { id: "separator:chats-sources", type: "separator" },
+                    { id: "separator:sessions-sources", type: "separator" },
                     // --- Sources & Skills Section ---
                     {
                       id: "nav:sources",
@@ -2409,7 +2450,7 @@ function AppShellContent({
                   {/* Filter dropdown - available in ALL chat views.
                       Shows user-added filters (removable) and pinned filters (non-removable, derived from route).
                       Pinned filters: state views pin a status, label views pin a label, flagged pins the flag. */}
-                  {isSessionsNavigation(navState) && (
+                  {middlePanelMode === 'sessions' && (
                     <DropdownMenu onOpenChange={(open) => { if (!open) setFilterDropdownQuery('') }}>
                       <DropdownMenuTrigger asChild>
                         <HeaderIconButton
@@ -2963,12 +3004,16 @@ function AppShellContent({
                       {...getEditConfig('add-skill', activeWorkspace.rootPath)}
                     />
                   )}
+                  {/* [+] New Note/Folder button (only for notes mode) */}
+                  {middlePanelMode === 'filetree' && activeWorkspace && (
+                    <FileTreeHeaderActions workspacePath={activeWorkspace.rootPath} />
+                  )}
                 </>
               }
             />
-            {/* Content: SessionList, SourcesListPanel, or SettingsNavigator based on navigation state */}
+            {/* Content: File tree, session list, sources, skills, or settings */}
+            {/* Sources/Skills/Settings use NavigationState (override middlePanelMode) */}
             {isSourcesNavigation(navState) && (
-              /* Sources List - filtered by type if sourceFilter is active */
               <SourcesListPanel
                 sources={sources}
                 sourceFilter={sourceFilter}
@@ -2980,7 +3025,6 @@ function AppShellContent({
               />
             )}
             {isSkillsNavigation(navState) && activeWorkspaceId && (
-              /* Skills List */
               <SkillsListPanel
                 skills={skills}
                 workspaceId={activeWorkspaceId}
@@ -2991,13 +3035,19 @@ function AppShellContent({
               />
             )}
             {isSettingsNavigation(navState) && (
-              /* Settings Navigator */
               <SettingsNavigator
                 selectedSubpage={navState.subpage}
                 onSelectSubpage={(subpage) => handleSettingsClick(subpage)}
               />
             )}
-            {isSessionsNavigation(navState) && (
+            {/* File tree and session list controlled by middlePanelMode (not NavigationState) */}
+            {!isSourcesNavigation(navState) && !isSkillsNavigation(navState) && !isSettingsNavigation(navState) && middlePanelMode === 'filetree' && activeWorkspace && (
+              <FileTree
+                workspaceId={activeWorkspaceId!}
+                workspacePath={activeWorkspace.rootPath}
+              />
+            )}
+            {!isSourcesNavigation(navState) && !isSkillsNavigation(navState) && !isSettingsNavigation(navState) && middlePanelMode === 'sessions' && (
               /* Sessions List */
               <>
                 {/* SessionList: Scrollable list of session cards */}

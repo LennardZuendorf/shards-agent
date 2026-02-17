@@ -2,6 +2,7 @@
  * MainContentPanel - Right panel component for displaying content
  *
  * Renders content based on the unified NavigationState:
+ * - Notes navigator: Editor for selected note
  * - Chats navigator: ChatPage for selected session, or empty state
  * - Sources navigator: SourceInfoPage for selected source, or empty state
  * - Settings navigator: Settings, Preferences, or Shortcuts page
@@ -29,6 +30,7 @@ import {
   isSourcesNavigation,
   isSettingsNavigation,
   isSkillsNavigation,
+  isNotesNavigation,
 } from '@/contexts/NavigationContext'
 import { useSessionSelection, useIsMultiSelectActive, useSelectedIds, useSelectionCount } from '@/hooks/useSession'
 import { extractLabelId } from '@craft-agent/shared/labels'
@@ -36,6 +38,7 @@ import type { TodoStateId } from '@/config/todo-states'
 import { SourceInfoPage, ChatPage } from '@/pages'
 import SkillInfoPage from '@/pages/SkillInfoPage'
 import { getSettingsPageComponent } from '@/pages/settings/settings-pages'
+import { EditorTestPage } from '@/pages/EditorTestPage'
 
 export interface MainContentPanelProps {
   /** Whether the app is in focused mode (single chat, no sidebar) */
@@ -155,7 +158,6 @@ export function MainContentPanel({
         </Panel>
       )
     }
-    // No source selected - empty state
     return wrapWithStoplight(
       <Panel variant="grow" className={className}>
         <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -177,7 +179,6 @@ export function MainContentPanel({
         </Panel>
       )
     }
-    // No skill selected - empty state
     return wrapWithStoplight(
       <Panel variant="grow" className={className}>
         <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -187,9 +188,20 @@ export function MainContentPanel({
     )
   }
 
+  // Notes navigator - show editor
+  if (isNotesNavigation(navState) && activeWorkspaceId) {
+    return wrapWithStoplight(
+      <Panel variant="grow" className={className}>
+        <EditorTestPage
+          workspaceId={navState.details.workspaceId}
+          filePath={navState.details.filePath}
+        />
+      </Panel>
+    )
+  }
+
   // Chats navigator - show chat, multi-select panel, or empty state
   if (isSessionsNavigation(navState)) {
-    // Multi-select mode: show batch actions panel
     if (isMultiSelectActive) {
       return wrapWithStoplight(
         <Panel variant="grow" className={className}>
@@ -215,7 +227,6 @@ export function MainContentPanel({
         </Panel>
       )
     }
-    // No session selected - empty state
     return wrapWithStoplight(
       <Panel variant="grow" className={className}>
         <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -229,11 +240,11 @@ export function MainContentPanel({
     )
   }
 
-  // Fallback (should not happen with proper NavigationState)
+  // Fallback
   return wrapWithStoplight(
     <Panel variant="grow" className={className}>
       <div className="flex items-center justify-center h-full text-muted-foreground">
-        <p className="text-sm">Select a conversation to get started</p>
+        <p className="text-sm">Select a note or conversation to get started</p>
       </div>
     </Panel>
   )

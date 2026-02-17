@@ -96,6 +96,29 @@ export interface SessionFile {
   children?: SessionFile[]  // Recursive children for directories
 }
 
+// === Shards Types ===
+
+/**
+ * File/directory entry in a workspace (for note file tree)
+ */
+export interface FileNode {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  children?: FileNode[]
+}
+
+/**
+ * Result of opening a markdown file (frontmatter stripped)
+ */
+export interface FileOpenResult {
+  content: string       // markdown body (frontmatter stripped)
+  frontmatter: string   // raw frontmatter string (including --- delimiters), or ''
+}
+
+/** What the middle panel shows */
+export type MiddlePanelMode = 'filetree' | 'sessions'
+
 /**
  * File search result for @ mention file selection.
  * Returned by FS_SEARCH IPC handler when user types @filename in input.
@@ -872,6 +895,16 @@ export const IPC_CHANNELS = {
   MENU_COPY: 'menu:copy',
   MENU_PASTE: 'menu:paste',
   MENU_SELECT_ALL: 'menu:selectAll',
+
+  // Notes / File Editor (Shards)
+  NOTES_OPEN: 'notes:open',
+  NOTES_SAVE: 'notes:save',
+  NOTES_LIST: 'notes:list',
+  NOTES_CREATE: 'notes:create',
+  NOTES_CREATE_DIR: 'notes:create-dir',
+  NOTES_RENAME: 'notes:rename',
+  NOTES_DELETE: 'notes:delete',
+  NOTES_DELETE_CONFIRM: 'notes:delete-confirm',
 } as const
 
 // Re-import types for ElectronAPI
@@ -1194,6 +1227,16 @@ export interface ElectronAPI {
   testLlmConnection(slug: string): Promise<{ success: boolean; error?: string }>
   setDefaultLlmConnection(slug: string): Promise<{ success: boolean; error?: string }>
   setWorkspaceDefaultLlmConnection(workspaceId: string, slug: string | null): Promise<{ success: boolean; error?: string }>
+
+  // Notes / File Editor (Shards)
+  notesOpen(path: string): Promise<FileOpenResult>
+  notesSave(path: string, content: string, frontmatter: string): Promise<void>
+  notesList(dir: string): Promise<FileNode[]>
+  notesCreate(filePath: string): Promise<void>
+  notesCreateDir(dirPath: string): Promise<void>
+  notesRename(oldPath: string, newPath: string): Promise<void>
+  notesDelete(filePath: string): Promise<void>
+  notesDeleteConfirm(name: string): Promise<boolean>
 }
 
 /**
@@ -1351,6 +1394,21 @@ export interface SkillsNavigationState {
 }
 
 /**
+ * Notes navigation state - shows editor with a markdown file open
+ *
+ * Shards extension: When navigator === 'note', the right panel shows
+ * the tiptap editor with the specified file loaded.
+ * { navigator: 'note', details: { workspaceId: string, filePath: string } }
+ */
+export interface NotesNavigationState {
+  navigator: 'note'
+  /** Workspace and file path for the open note */
+  details: { workspaceId: string; filePath: string }
+  /** Optional right sidebar panel state */
+  rightSidebar?: RightSidebarPanel
+}
+
+/**
  * Unified navigation state - single source of truth for all 3 panels
  *
  * From this state we can derive:
@@ -1363,6 +1421,7 @@ export type NavigationState =
   | SourcesNavigationState
   | SettingsNavigationState
   | SkillsNavigationState
+  | NotesNavigationState
 
 /**
  * Type guard to check if state is sessions navigation
@@ -1393,6 +1452,13 @@ export const isSkillsNavigation = (
 ): state is SkillsNavigationState => state.navigator === 'skills'
 
 /**
+ * Type guard to check if state is notes navigation (Shards)
+ */
+export const isNotesNavigation = (
+  state: NavigationState
+): state is NotesNavigationState => state.navigator === 'note'
+
+/**
  * Default navigation state - allSessions with no selection
  */
 export const DEFAULT_NAVIGATION_STATE: NavigationState = {
@@ -1405,6 +1471,9 @@ export const DEFAULT_NAVIGATION_STATE: NavigationState = {
  * Get a persistence key for localStorage from NavigationState
  */
 export const getNavigationStateKey = (state: NavigationState): string => {
+  if (state.navigator === 'note') {
+    return `note:${state.details.filePath}`
+  }
   if (state.navigator === 'sources') {
     if (state.details) {
       return `sources/source/${state.details.sourceSlug}`
@@ -1438,6 +1507,9 @@ export const getNavigationStateKey = (state: NavigationState): string => {
  * Returns null if the key is invalid
  */
 export const parseNavigationStateKey = (key: string): NavigationState | null => {
+  // Handle notes (Shards) — note:filePath doesn't roundtrip workspaceId, return null
+  if (key.startsWith('note:')) return null
+
   // Handle sources
   if (key === 'sources') return { navigator: 'sources', details: null }
   if (key.startsWith('sources/source/')) {

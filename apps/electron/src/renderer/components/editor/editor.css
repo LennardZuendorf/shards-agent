@@ -1,0 +1,118 @@
+/* Shards Editor Styles */
+
+.shards-editor-content {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.shards-editor-content .tiptap.ProseMirror.shards-editor {
+  flex: 1;
+  padding: 2rem 2rem 30vh;
+  outline: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+
+.shards-editor-content .tiptap.ProseMirror.shards-editor:focus {
+  outline: none;
+}
+
+/* Placeholder */
+.shards-editor-content .tiptap p.is-editor-empty:first-child::before {
+  color: var(--foreground, #999);
+  opacity: 0.4;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Code blocks */
+.shards-editor-content .tiptap pre {
+  background: var(--background);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+  font-size: 0.875rem;
+  overflow-x: auto;
+}
+
+.shards-editor-content .tiptap pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Inline code */
+.shards-editor-content .tiptap code {
+  background: var(--background);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.25rem;
+  padding: 0.15em 0.3em;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+  font-size: 0.9em;
+}
+
+/* Task lists */
+.shards-editor-content .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.shards-editor-content .tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.shards-editor-content .tiptap ul[data-type="taskList"] li > label {
+  margin-top: 0.25rem;
+}
+
+/* Tables */
+.shards-editor-content .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.shards-editor-content .tiptap th,
+.shards-editor-content .tiptap td {
+  border: 1px solid var(--border, #e5e7eb);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.shards-editor-content .tiptap th {
+  background: var(--background);
+  font-weight: 600;
+}
+
+/* Blockquotes */
+.shards-editor-content .tiptap blockquote {
+  border-left: 3px solid var(--border, #e5e7eb);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--foreground);
+  opacity: 0.8;
+}
+
+/* Horizontal rule */
+.shards-editor-content .tiptap hr {
+  border: none;
+  border-top: 1px solid var(--border, #e5e7eb);
+  margin: 1.5rem 0;
+}
+
+/* Selection highlight */
+.shards-editor-content .tiptap ::selection {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 20%, transparent);
+}

@@ -14,6 +14,7 @@ import type {
   SessionFilter,
   SourceFilter,
   RightSidebarPanel,
+  NotesNavigationState,
 } from './types'
 import { isValidSettingsSubpage, type SettingsSubpage } from './settings-registry'
 
@@ -58,7 +59,7 @@ export interface ParsedCompoundRoute {
  * Known prefixes that indicate a compound route
  */
 const COMPOUND_ROUTE_PREFIXES = [
-  'allSessions', 'flagged', 'archived', 'state', 'label', 'view', 'sources', 'skills', 'settings'
+  'allSessions', 'flagged', 'archived', 'state', 'label', 'view', 'sources', 'skills', 'settings', 'note'
 ]
 
 /**
@@ -398,6 +399,23 @@ export function parseRouteToNavigationState(
   route: string,
   sidebarParam?: string
 ): NavigationState | null {
+  // Parse note routes: note/{workspaceId}?path={filePath}
+  const [routePath, routeQuery] = route.split('?')
+  if (routePath.startsWith('note/')) {
+    const workspaceId = routePath.slice(5) // after 'note/'
+    if (!workspaceId) return null
+    const params = new URLSearchParams(routeQuery || '')
+    const filePath = params.get('path')
+    if (!filePath) return null
+    const state: NotesNavigationState = {
+      navigator: 'note',
+      details: { workspaceId, filePath },
+    }
+    const rightSidebar = parseRightSidebarParam(sidebarParam)
+    if (rightSidebar) return { ...state, rightSidebar }
+    return state
+  }
+
   // Parse compound routes
   if (isCompoundRoute(route)) {
     const compound = parseCompoundRoute(route)
@@ -607,6 +625,10 @@ function convertParsedRouteToNavigationState(parsed: ParsedRoute): NavigationSta
  * Build a route string from NavigationState
  */
 export function buildRouteFromNavigationState(state: NavigationState): string {
+  if (state.navigator === 'note') {
+    return `note/${state.details.workspaceId}?path=${encodeURIComponent(state.details.filePath)}`
+  }
+
   if (state.navigator === 'settings') {
     return `settings/${state.subpage}`
   }

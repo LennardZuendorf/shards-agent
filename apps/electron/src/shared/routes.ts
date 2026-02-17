@@ -161,6 +161,10 @@ export const routes = {
       subpage
         ? `settings/${subpage}` as const
         : 'settings' as const,
+
+    /** Note view (notes navigator) - opens a markdown file in the editor */
+    note: (workspaceId: string, filePath: string) =>
+      `note/${workspaceId}?path=${encodeURIComponent(filePath)}` as const,
   },
 } as const
 

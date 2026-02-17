@@ -148,7 +148,16 @@ function copyResources(): void {
 }
 
 // Build MCP servers for Codex sessions (one-time, no watch needed)
+// Note: These packages are not open-sourced by upstream; skip gracefully when missing.
 async function buildMcpServers(): Promise<void> {
+  const sessionEntry = join(ROOT_DIR, "packages/session-mcp-server/src/index.ts");
+  const bridgeEntry = join(ROOT_DIR, "packages/bridge-mcp-server/src/index.ts");
+
+  if (!existsSync(sessionEntry) && !existsSync(bridgeEntry)) {
+    console.log("⏭️  MCP server sources not found, skipping build (not included in OSS)");
+    return;
+  }
+
   console.log("🌉 Building MCP servers for Codex sessions...");
 
   // Ensure dist directories exist
@@ -159,18 +168,22 @@ async function buildMcpServers(): Promise<void> {
 
   // Build both servers in parallel
   const [sessionResult, bridgeResult] = await Promise.all([
-    runEsbuild(
-      "packages/session-mcp-server/src/index.ts",
-      "packages/session-mcp-server/dist/index.js",
-      {},
-      { packagesExternal: true }
-    ),
-    runEsbuild(
-      "packages/bridge-mcp-server/src/index.ts",
-      "packages/bridge-mcp-server/dist/index.js",
-      {},
-      { packagesExternal: true }
-    ),
+    existsSync(sessionEntry)
+      ? runEsbuild(
+          "packages/session-mcp-server/src/index.ts",
+          "packages/session-mcp-server/dist/index.js",
+          {},
+          { packagesExternal: true }
+        )
+      : Promise.resolve({ success: true }),
+    existsSync(bridgeEntry)
+      ? runEsbuild(
+          "packages/bridge-mcp-server/src/index.ts",
+          "packages/bridge-mcp-server/dist/index.js",
+          {},
+          { packagesExternal: true }
+        )
+      : Promise.resolve({ success: true }),
   ]);
 
   if (!sessionResult.success) {

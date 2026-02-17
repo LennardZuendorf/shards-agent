@@ -39,6 +39,7 @@ export function RenameDialog({
     if (open) {
       const timer = setTimeout(() => {
         inputRef.current?.focus()
+        inputRef.current?.select()
       }, 0)
       return () => clearTimeout(timer)
     }

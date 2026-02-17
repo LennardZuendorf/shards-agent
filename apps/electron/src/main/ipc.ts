@@ -1,5 +1,5 @@
 import { app, ipcMain, nativeTheme, nativeImage, dialog, shell, BrowserWindow } from 'electron'
-import { readFile, readdir, stat, realpath, mkdir, writeFile, unlink, rm } from 'fs/promises'
+import { readFile, readdir, stat, realpath, mkdir, writeFile, unlink, rm, rename } from 'fs/promises'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { normalize, isAbsolute, join, basename, dirname, resolve, relative, sep } from 'path'
 import { homedir, tmpdir } from 'os'
@@ -3620,5 +3620,114 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
 
   // Note: Permission mode cycling settings (cyclablePermissionModes) are now workspace-level
   // and managed via WORKSPACE_SETTINGS_GET/UPDATE channels
+
+  // ============================================================
+  // Notes / File Editor (Shards)
+  // ============================================================
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_OPEN, async (_event, filePath: string) => {
+    const safePath = await validateFilePath(filePath)
+    const raw = await readFile(safePath, 'utf-8')
+
+    // Parse frontmatter with gray-matter (only if at byte 0)
+    const matter = (await import('gray-matter')).default
+    const parsed = matter(raw)
+
+    // Reconstruct the raw frontmatter string (including --- delimiters)
+    let frontmatter = ''
+    if (parsed.matter && parsed.matter.trim().length > 0) {
+      frontmatter = `---\n${parsed.matter}\n---\n`
+    }
+
+    return { content: parsed.content, frontmatter }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_SAVE, async (_event, filePath: string, content: string, frontmatter: string) => {
+    const safePath = await validateFilePath(filePath)
+    // Re-prepend frontmatter before writing
+    const output = frontmatter ? frontmatter + content : content
+    await mkdir(dirname(safePath), { recursive: true })
+    await writeFile(safePath, output, 'utf-8')
+  })
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_LIST, async (_event, dir: string) => {
+    const safePath = await validateFilePath(dir)
+
+    const buildTree = async (dirPath: string): Promise<import('../shared/types').FileNode[]> => {
+      const entries = await readdir(dirPath, { withFileTypes: true })
+      const nodes: import('../shared/types').FileNode[] = []
+
+      for (const entry of entries) {
+        // Skip dot-directories and special files
+        if (entry.name.startsWith('.')) continue
+        if (entry.name === 'CLAUDE.md' || entry.name === 'AGENTS.md') continue
+        if (entry.name === 'node_modules') continue
+
+        const fullPath = join(dirPath, entry.name)
+
+        if (entry.isDirectory()) {
+          const children = await buildTree(fullPath)
+          // Only include directories that have .md files (directly or nested)
+          if (children.length > 0) {
+            nodes.push({ name: entry.name, path: fullPath, type: 'directory', children })
+          }
+        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+          nodes.push({ name: entry.name, path: fullPath, type: 'file' })
+        }
+      }
+
+      // Sort: directories first, then files, alphabetically
+      nodes.sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+        return a.name.localeCompare(b.name)
+      })
+
+      return nodes
+    }
+
+    return buildTree(safePath)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_CREATE, async (_event, filePath: string) => {
+    const safePath = await validateFilePath(filePath)
+    if (existsSync(safePath)) {
+      throw new Error(`File "${basename(safePath)}" already exists`)
+    }
+    await mkdir(dirname(safePath), { recursive: true })
+    await writeFile(safePath, '', 'utf-8')
+  })
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_CREATE_DIR, async (_event, dirPath: string) => {
+    const safePath = await validateFilePath(dirPath)
+    await mkdir(safePath, { recursive: true })
+  })
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_RENAME, async (_event, oldPath: string, newPath: string) => {
+    const safeOld = await validateFilePath(oldPath)
+    const safeNew = await validateFilePath(newPath)
+    if (existsSync(safeNew)) {
+      throw new Error(`A file or folder named "${basename(safeNew)}" already exists`)
+    }
+    await rename(safeOld, safeNew)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_DELETE, async (_event, filePath: string) => {
+    const safePath = await validateFilePath(filePath)
+    await shell.trashItem(safePath)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.NOTES_DELETE_CONFIRM, async (_event, name: string) => {
+    const window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    const result = await dialog.showMessageBox(window, {
+      type: 'warning',
+      buttons: ['Cancel', 'Move to Trash'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Delete Note',
+      message: `Are you sure you want to delete "${name}"?`,
+      detail: 'The file will be moved to the Trash.',
+    } as Electron.MessageBoxOptions)
+    return result.response === 1
+  })
 
 }

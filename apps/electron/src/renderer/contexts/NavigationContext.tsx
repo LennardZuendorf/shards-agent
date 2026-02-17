@@ -36,6 +36,7 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai'
 import { useSession } from '@/hooks/useSession'
 import {
   parseRoute,
+  isCompoundRoute,
   parseRouteToNavigationState,
   buildRouteFromNavigationState,
   buildUrlWithState,
@@ -58,6 +59,7 @@ import {
   isSourcesNavigation,
   isSettingsNavigation,
   isSkillsNavigation,
+  isNotesNavigation,
   DEFAULT_NAVIGATION_STATE,
 } from '../../shared/types'
 import { isValidSettingsSubpage, type SettingsSubpage } from '../../shared/settings-registry'
@@ -71,7 +73,7 @@ export type { Route }
 
 // Re-export navigation state types for consumers
 export type { NavigationState, SessionFilter }
-export { isSessionsNavigation, isSourcesNavigation, isSettingsNavigation, isSkillsNavigation }
+export { isSessionsNavigation, isSourcesNavigation, isSettingsNavigation, isSkillsNavigation, isNotesNavigation }
 
 interface NavigationContextValue {
   /** Navigate to a route */
@@ -506,18 +508,21 @@ export function NavigationProvider({
   const navigate = useCallback(
     async (route: Route) => {
       const parsed = parseRoute(route)
-      if (!parsed) {
+
+      // parseRoute doesn't handle all compound routes (e.g. note routes).
+      // Fall through to parseRouteToNavigationState which handles them.
+      if (!parsed && !isCompoundRoute(route)) {
         console.warn('[Navigation] Invalid route:', route)
         return
       }
 
-      if (!isReady) {
+      if (!isReady && parsed) {
         pendingNavigationRef.current = parsed
         return
       }
 
       // Handle actions (side effects)
-      if (parsed.type === 'action') {
+      if (parsed?.type === 'action') {
         await handleActionNavigation(parsed)
         return // Actions handle their own state updates
       }

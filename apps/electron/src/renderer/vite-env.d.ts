@@ -26,3 +26,9 @@ declare module "*.pdf?url" {
   const src: string
   export default src
 }
+
+// SCSS imports (tiptap UI components)
+declare module "*.scss" {
+  const content: string
+  export default content
+}
